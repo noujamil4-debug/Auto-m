@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       site_idea:
-        description: 'وصف الموقع'
+        description: 'ما هو موضوع الموقع؟'
         required: true
         default: 'موقع بسيط'
 
@@ -16,24 +16,27 @@ jobs:
 
       - name: Call Gemini AI
         run: |
-          # سنستخدم هنا الموديل 1.5-flash مع v1beta لكن بتنسيق أدق
-          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+          # نستخدم هنا v1 (النسخة المستقرة) وموديل flash-latest
+          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
           -H 'Content-Type: application/json' \
           -d '{
             "contents": [{
               "parts":[{
-                "text": "Write a complete single-file HTML website with CSS and JS for: ${{ github.event.inputs.site_idea }}. Give me ONLY the raw HTML code. Start immediately with <!DOCTYPE html>."
+                "text": "Write a complete single-file HTML website with CSS for: ${{ github.event.inputs.site_idea }}. Give me ONLY the HTML code. No markdown code blocks."
               }]
             }]
           }')
           
-          # طباعة الرد للفحص في حال الفشل
-          echo "Server Response: $RESPONSE"
+          # فحص الرد للتأكد من نجاح العملية
+          if echo "$RESPONSE" | grep -q "error"; then
+            echo "خطأ من جوجل: $RESPONSE"
+            exit 1
+          fi
           
           # استخراج الكود وحفظه
           echo "$RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['candidates'][0]['content']['parts'][0]['text'])" > index.html
           
-          # تنظيف الكود من أي علامات Markdown
+          # تنظيف أي علامات زائدة
           sed -i 's/```html//g' index.html
           sed -i 's/```//g' index.html
 
@@ -42,5 +45,5 @@ jobs:
           git config --global user.name "AI-Agent"
           git config --global user.email "ai@agent.com"
           git add index.html
-          git commit -m "Update site" || echo "No changes"
+          git commit -m "Site updated" || echo "No changes"
           git push
