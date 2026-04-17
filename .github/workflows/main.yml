@@ -1,0 +1,38 @@
+name: AI Website Builder
+on:
+  workflow_dispatch:
+    inputs:
+      site_idea:
+        description: 'ماذا تريد أن يكون موضوع الموقع؟'
+        required: true
+        default: 'مطعم بيتزا احترافي'
+
+jobs:
+  create-site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Call Gemini AI
+        run: |
+          curl https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }} \
+          -H 'Content-Type: application/json' \
+          -X POST \
+          -d '{
+            "contents": [{
+              "parts":[{
+                "text": "Write a complete single-file HTML website with CSS and JS for: ${{ github.event.inputs.site_idea }}. Make it modern and professional. Give me ONLY the code inside <html> tags. No markdown code blocks, just the raw code."
+              }]
+            }]
+          }' > raw_response.json
+          
+          cat raw_response.json | python3 -c "import sys, json; data = json.load(sys.stdin); print(data['candidates'][0]['content']['parts'][0]['text'].replace('```html', '').replace('```', ''))" > index.html
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "AI-Agent"
+          git config --global user.email "ai@agent.com"
+          git add index.html
+          git commit -m "New site created" || echo "No changes"
+          git push
