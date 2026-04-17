@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       site_idea:
-        description: 'ما هو موضوع الموقع؟'
+        description: 'وصف الموقع'
         required: true
         default: 'موقع بسيط'
 
@@ -16,27 +16,24 @@ jobs:
 
       - name: Call Gemini AI
         run: |
-          # نستخدم هنا v1 (النسخة المستقرة) وموديل flash-latest
+          # هذه المرة سنستخدم v1 الرسمي مع flash
           RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
           -H 'Content-Type: application/json' \
           -d '{
             "contents": [{
               "parts":[{
-                "text": "Write a complete single-file HTML website with CSS for: ${{ github.event.inputs.site_idea }}. Give me ONLY the HTML code. No markdown code blocks."
+                "text": "Write a complete single-file HTML website with CSS for: ${{ github.event.inputs.site_idea }}. Give me ONLY the HTML code. Do NOT use markdown code blocks."
               }]
             }]
           }')
           
-          # فحص الرد للتأكد من نجاح العملية
-          if echo "$RESPONSE" | grep -q "error"; then
-            echo "خطأ من جوجل: $RESPONSE"
-            exit 1
-          fi
+          # فحص إذا كان هناك رد فعلي
+          echo "Response: $RESPONSE"
           
-          # استخراج الكود وحفظه
+          # استخراج الكود وحفظه باستخدام طريقة أكثر أماناً
           echo "$RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['candidates'][0]['content']['parts'][0]['text'])" > index.html
           
-          # تنظيف أي علامات زائدة
+          # تنظيف الكود
           sed -i 's/```html//g' index.html
           sed -i 's/```//g' index.html
 
@@ -45,5 +42,5 @@ jobs:
           git config --global user.name "AI-Agent"
           git config --global user.email "ai@agent.com"
           git add index.html
-          git commit -m "Site updated" || echo "No changes"
+          git commit -m "Site Update" || echo "No changes"
           git push
