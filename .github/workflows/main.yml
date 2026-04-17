@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       site_idea:
-        description: 'ماذا تريد أن يكون موضوع الموقع؟'
+        description: 'وصف الموقع'
         required: true
-        default: 'مطعم بيتزا احترافي'
+        default: 'موقع بسيط'
 
 jobs:
   create-site:
@@ -16,18 +16,28 @@ jobs:
 
       - name: Call Gemini AI
         run: |
-          curl https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }} \
+          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
           -H 'Content-Type: application/json' \
-          -X POST \
           -d '{
             "contents": [{
               "parts":[{
-                "text": "Write a complete single-file HTML website with CSS and JS for: ${{ github.event.inputs.site_idea }}. Make it modern and professional. Give me ONLY the code inside <html> tags. No markdown code blocks, just the raw code."
+                "text": "Write a complete single-file HTML website with CSS and JS for: ${{ github.event.inputs.site_idea }}. Give me ONLY the raw HTML code. Do NOT use markdown. Start with <!DOCTYPE html>."
               }]
             }]
-          }' > raw_response.json
+          }')
           
-          cat raw_response.json | python3 -c "import sys, json; data = json.load(sys.stdin); print(data['candidates'][0]['content']['parts'][0]['text'].replace('```html', '').replace('```', ''))" > index.html
+          # فحص إذا كان الرد يحتوي على خطأ
+          if echo "$RESPONSE" | grep -q "error"; then
+            echo "حدث خطأ من جوجل: $RESPONSE"
+            exit 1
+          fi
+          
+          # استخراج الكود وحفظه
+          echo "$RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['candidates'][0]['content']['parts'][0]['text'])" > index.html
+          
+          # تنظيف أي علامات زائدة
+          sed -i 's/```html//g' index.html
+          sed -i 's/```//g' index.html
 
       - name: Commit and Push
         run: |
