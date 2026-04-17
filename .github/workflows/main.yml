@@ -5,7 +5,7 @@ on:
       site_idea:
         description: 'وصف الموقع'
         required: true
-        default: 'مطعم احترافي'
+        default: 'موقع بسيط'
 
 jobs:
   create-site:
@@ -16,31 +16,31 @@ jobs:
 
       - name: Call Gemini AI
         run: |
-          # نستخدم هنا v1 بدلاً من v1beta لضمان الاستقرار
-          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+          # سنستخدم هنا الموديل 1.5-flash مع v1beta لكن بتنسيق أدق
+          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
           -H 'Content-Type: application/json' \
           -d '{
             "contents": [{
               "parts":[{
-                "text": "Write a complete single-file HTML website with CSS and JS for: ${{ github.event.inputs.site_idea }}. Give me ONLY the raw HTML code. Do NOT use markdown code blocks like ```html. Start immediately with <!DOCTYPE html>."
+                "text": "Write a complete single-file HTML website with CSS and JS for: ${{ github.event.inputs.site_idea }}. Give me ONLY the raw HTML code. Start immediately with <!DOCTYPE html>."
               }]
             }]
           }')
           
-          # فحص الرد
-          if echo "$RESPONSE" | grep -q "error"; then
-            echo "خطأ من جوجل: $RESPONSE"
-            exit 1
-          fi
+          # طباعة الرد للفحص في حال الفشل
+          echo "Server Response: $RESPONSE"
           
-          # استخراج الكود وحفظه وتنظيفه من أي زوائد
-          echo "$RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['candidates'][0]['content']['parts'][0]['text'])" > raw.html
-          sed -e 's/```html//g' -e 's/```//g' raw.html > index.html
+          # استخراج الكود وحفظه
+          echo "$RESPONSE" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['candidates'][0]['content']['parts'][0]['text'])" > index.html
+          
+          # تنظيف الكود من أي علامات Markdown
+          sed -i 's/```html//g' index.html
+          sed -i 's/```//g' index.html
 
       - name: Commit and Push
         run: |
           git config --global user.name "AI-Agent"
           git config --global user.email "ai@agent.com"
           git add index.html
-          git commit -m "Site updated by AI" || echo "No changes"
+          git commit -m "Update site" || echo "No changes"
           git push
